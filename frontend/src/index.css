@@ -1171,3 +1171,13 @@ a {
   .landing-hero h1 { font-size: 34px; }
   .landing-nav { padding: 16px 20px; }
 }
+
+/* ---------- Received email viewer ---------- */
+.email-view { border: 1px solid var(--border-primary); border-radius: 12px; background: var(--bg-secondary); overflow: hidden; }
+.email-view-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--border-primary); font-size: 13px; color: var(--text-secondary); }
+.email-view-head strong { color: var(--text-primary); }
+.email-view-body { padding: 16px; max-height: 240px; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.65; color: var(--text-primary); }
+.email-view-body.expanded { max-height: 60vh; }
+.email-view-body.muted { color: var(--text-tertiary); font-style: italic; }
+.email-view-toggle { width: 100%; padding: 8px; border: 0; border-top: 1px solid var(--border-primary); background: var(--bg-tertiary); color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.email-view-toggle:hover { background: var(--bg-hover); }

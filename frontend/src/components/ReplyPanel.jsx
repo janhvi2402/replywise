@@ -1,178 +1,198 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const TONES = [
-  { id: 'professional', label: 'Professional' },
-  { id: 'friendly', label: 'Friendly' },
-  { id: 'casual', label: 'Casual' },
-  { id: 'formal', label: 'Formal' },
-  { id: 'concise', label: 'Concise' },
+  ['professional', 'Professional'],
+  ['friendly', 'Friendly'],
+  ['concise', 'Concise'],
+  ['formal', 'Formal'],
 ]
 
+function senderName(from = '') {
+  return from.replace(/<.*?>/g, '').replace(/"/g, '').trim() || from
+}
+
+function formatDate(value) {
+  const d = new Date(value)
+  return isNaN(d) ? value : d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+async function api(path, options = {}) {
+  let res
+  try {
+    res = await fetch(path, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    })
+  } catch {
+    throw new Error('Cannot reach the server. Is the backend running?')
+  }
+  let data = null
+  try { data = await res.json() } catch { /* non-JSON */ }
+  if (res.status === 401) throw new Error('Your session has expired. Sign out and sign in again.')
+  if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`)
+  return data
+}
+
 export default function ReplyPanel({ email, onBack }) {
+  const [full, setFull] = useState(null)
+  const [loadingMail, setLoadingMail] = useState(true)
+  const [mailError, setMailError] = useState('')
+  const [expanded, setExpanded] = useState(false)
+
   const [tone, setTone] = useState('professional')
   const [draft, setDraft] = useState('')
-  const [status, setStatus] = useState({ type: '', message: '' })
+  const [to, setTo] = useState('')
   const [generating, setGenerating] = useState(false)
   const [sending, setSending] = useState(false)
+  const [toast, setToast] = useState(null)
 
-  const handleGenerate = async () => {
+  // Load the full message
+  useEffect(() => {
+    let cancelled = false
+    setFull(null)
+    setMailError('')
+    setLoadingMail(true)
+    api(`/emails/${email.id}`)
+      .then((d) => { if (!cancelled) setFull(d) })
+      .catch((err) => { if (!cancelled) setMailError(err.message) })
+      .finally(() => { if (!cancelled) setLoadingMail(false) })
+    return () => { cancelled = true }
+  }, [email.id])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  async function generate() {
     setGenerating(true)
-    setStatus({ type: 'loading', message: 'AI is crafting your reply...' })
     try {
-      const res = await fetch(`/emails/${email.id}/reply`, {
+      const d = await api(`/emails/${email.id}/reply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tone, send: false }),
+        body: JSON.stringify({ send: false, tone }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to generate reply')
-      setDraft(data.reply)
-      setStatus({ type: 'success', message: 'Draft generated successfully!' })
-      setTimeout(() => setStatus({ type: '', message: '' }), 3000)
+      setDraft(d.reply)
+      setTo(d.to)
     } catch (err) {
-      setStatus({ type: 'error', message: err.message })
+      setToast({ type: 'error', text: err.message })
     } finally {
       setGenerating(false)
     }
   }
 
-  const handleSend = async () => {
-    if (!draft.trim()) {
-      setStatus({ type: 'error', message: 'Please write or generate a reply first' })
-      return
-    }
-    if (!window.confirm('Send this reply?')) return
-
+  async function send() {
+    if (!draft.trim()) return
+    if (!window.confirm(`Send this reply to ${to || senderName(email.from)}?`)) return
     setSending(true)
-    setStatus({ type: 'loading', message: 'Sending your reply...' })
     try {
-      const res = await fetch(`/emails/${email.id}/reply`, {
+      await api(`/emails/${email.id}/reply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ send: true, reply: draft }),
+        body: JSON.stringify({ send: true, reply: draft, tone }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to send')
-      setStatus({ type: 'success', message: 'Reply sent successfully! ✓' })
+      setToast({ type: 'success', text: 'Reply sent successfully.' })
       setDraft('')
     } catch (err) {
-      setStatus({ type: 'error', message: err.message })
+      setToast({ type: 'error', text: err.message })
     } finally {
       setSending(false)
     }
   }
 
-  const senderName = email.from.replace(/<.*>/, '').trim().replace(/"/g, '')
+  const body = full?.body?.trim()
 
   return (
-    <div className="reply-panel">
-      {/* Header */}
+    <section className="reply-panel">
       <div className="reply-panel-header">
-        <button className="back-btn" onClick={onBack}>
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-          </svg>
-          Back
-        </button>
-        <h3>Re: {email.subject || '(No subject)'}</h3>
-        <div className="reply-meta">
-          <div className="reply-meta-item">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round"
-                d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0" />
-            </svg>
-            <span>From: <strong>{senderName}</strong></span>
-          </div>
-        </div>
+        <button className="back-btn" onClick={onBack}>← Back</button>
+        <h3>{email.subject || '(no subject)'}</h3>
       </div>
 
-      {/* Body */}
       <div className="reply-panel-body">
-        {/* Tone Selector */}
+        {/* ---------- Received email ---------- */}
+        <div className="email-view">
+          <div className="email-view-head">
+            <span>From <strong>{full?.from || email.from}</strong></span>
+            {full?.date && <span>{formatDate(full.date)}</span>}
+          </div>
+
+          {loadingMail ? (
+            <div className="email-view-body muted">Loading message…</div>
+          ) : mailError ? (
+            <div className="email-view-body muted">{mailError}</div>
+          ) : (
+            <div className={`email-view-body ${expanded ? 'expanded' : ''} ${body ? '' : 'muted'}`}>
+              {body || email.snippet || 'This message has no readable text content.'}
+            </div>
+          )}
+
+          {body && body.length > 600 && (
+            <button className="email-view-toggle" onClick={() => setExpanded((v) => !v)}>
+              {expanded ? 'Show less' : 'Show full message'}
+            </button>
+          )}
+        </div>
+
+        {/* ---------- Tone ---------- */}
         <div className="tone-section">
-          <label>Reply Tone</label>
+          <label>Tone</label>
           <div className="tone-pills">
-            {TONES.map(t => (
+            {TONES.map(([value, label]) => (
               <button
-                key={t.id}
-                className={`tone-pill ${tone === t.id ? 'active' : ''}`}
-                onClick={() => setTone(t.id)}
+                key={value}
+                className={`tone-pill ${tone === value ? 'active' : ''}`}
+                onClick={() => setTone(value)}
+                disabled={generating || sending}
               >
-                {t.label}
+                {label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Generate Button */}
         <button
           className={`generate-btn ${generating ? 'loading' : ''}`}
-          onClick={handleGenerate}
-          disabled={generating}
+          onClick={generate}
+          disabled={generating || sending}
         >
-          {generating ? (
-            <>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round"
-                  d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
-              </svg>
-              Generating...
-            </>
-          ) : (
-            <>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round"
-                  d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
-              </svg>
-              Generate AI Reply
-            </>
-          )}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" />
+          </svg>
+          {generating ? 'Generating…' : draft ? 'Regenerate reply' : 'Generate reply'}
         </button>
 
-        {/* Draft Textarea */}
+        {/* ---------- Draft ---------- */}
         <div className="draft-section">
-          <label>Your Reply</label>
+          <label htmlFor="draft">Your reply</label>
           <textarea
+            id="draft"
             className="draft-textarea"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Click 'Generate AI Reply' to get a smart draft, or type your own reply here..."
+            disabled={generating}
+            placeholder={generating ? 'Drafting your reply…' : 'Click “Generate reply”, then edit the draft here before sending.'}
           />
         </div>
       </div>
 
-      {/* Footer */}
       <div className="reply-panel-footer">
-        {status.message ? (
-          <div className={`status-message ${status.type}`}>
-            {status.type === 'loading' && <div className="spinner" />}
-            {status.type === 'success' && (
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            )}
-            {status.type === 'error' && (
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-              </svg>
-            )}
-            {status.message}
-          </div>
-        ) : <div />}
+        {generating ? (
+          <div className="status-message loading"><span className="spinner" /> Drafting…</div>
+        ) : to ? (
+          <div className="reply-meta-item">To: <strong>{to}</strong></div>
+        ) : <span />}
 
-        <button
-          className="send-btn"
-          onClick={handleSend}
-          disabled={!draft.trim() || sending}
-        >
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round"
-              d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+        <button className="send-btn" onClick={send} disabled={!draft.trim() || generating || sending}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m22 2-7 20-4-9-9-4z" />
+            <path d="M22 2 11 13" />
           </svg>
-          {sending ? 'Sending...' : 'Send Reply'}
+          {sending ? 'Sending…' : 'Send reply'}
         </button>
       </div>
-    </div>
+
+      {toast && <div className={`toast ${toast.type}`} role="status"><span>{toast.text}</span></div>}
+    </section>
   )
 }
-
