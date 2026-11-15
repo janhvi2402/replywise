@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import ThemeToggle from './ThemeToggle'
 
-const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:5000'
+const BACKEND = import.meta.env.PROD ? '' : 'http://127.0.0.1:5000'
 
 const STEPS = [
   ['Connect Gmail', 'Sign in with Google and allow read and send access.'],
@@ -81,7 +81,8 @@ export default function LoginScreen() {
 
           {failed && (
             <div className="landing-alert" role="alert">
-              Sign-in did not complete. Open this app at http://127.0.0.1:5173 and try again.
+              Sign-in did not complete. Please try again
+              {import.meta.env.DEV ? ' (open this app at http://127.0.0.1:5173)' : ''}.
             </div>
           )}
 
