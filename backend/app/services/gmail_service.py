@@ -4,6 +4,8 @@ from flask import session
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 import os
+import re
+from html.parser import HTMLParser
 
 def get_gmail_service():
     data = session.get("credentials")
@@ -19,14 +21,63 @@ def _header(headers, name):
     return ""
 
 
-def _extract_body(payload):
-    if payload.get("mimeType") == "text/plain" and payload.get("body", {}).get("data"):
-        return base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", errors="ignore")
+class _HTMLText(HTMLParser):
+    BLOCK = {"p", "div", "tr", "li", "h1", "h2", "h3", "h4", "h5", "h6", "table", "ul", "ol"}
+    SKIP = {"script", "style", "head"}
+
+    def __init__(self):
+        super().__init__()
+        self.parts = []
+        self._skip = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.SKIP:
+            self._skip += 1
+        elif tag == "br" or tag in self.BLOCK:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag):
+        if tag in self.SKIP:
+            self._skip = max(0, self._skip - 1)
+        elif tag in self.BLOCK:
+            self.parts.append("\n")
+
+    def handle_data(self, data):
+        if not self._skip:
+            self.parts.append(data)
+
+
+def html_to_text(html):
+    parser = _HTMLText()
+    parser.feed(html)
+    parser.close()
+    text = "".join(parser.parts)
+    text = re.sub(r"[ \t\xa0]+", " ", text)
+    text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
+    return text.strip()
+
+
+def _decode(data):
+    data += "=" * (-len(data) % 4)   # Gmail omits base64 padding
+    return base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+
+
+def _find_part(payload, mime):
+    if payload.get("mimeType") == mime and payload.get("body", {}).get("data"):
+        return _decode(payload["body"]["data"])
     for part in payload.get("parts", []) or []:
-        text = _extract_body(part)
-        if text:
-            return text
+        found = _find_part(part, mime)
+        if found:
+            return found
     return ""
+
+
+def _extract_body(payload):
+    text = _find_part(payload, "text/plain")
+    if text.strip():
+        return text.strip()
+    html = _find_part(payload, "text/html")
+    return html_to_text(html) if html else ""
 
 
 def list_emails(service, max_results=10):
@@ -56,6 +107,8 @@ def get_email(service, msg_id):
         "id": msg["id"],
         "thread_id": msg["threadId"],
         "from": _header(h, "From"),
+        "to": _header(h, "To"),
+        "date": _header(h, "Date"),
         "reply_to": _header(h, "Reply-To") or _header(h, "From"),
         "subject": _header(h, "Subject"),
         "message_id": _header(h, "Message-ID"),

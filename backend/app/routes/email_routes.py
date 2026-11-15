@@ -52,3 +52,17 @@ def reply(msg_id):
         send=bool(body.get("send", False)),
         edited_reply=body.get("reply"),
     )
+@email_bp.route("/<msg_id>")
+def read_email(msg_id):
+    service = get_gmail_service()
+    if not service:
+        return NOT_LOGGED_IN
+    email = get_email(service, msg_id)
+    return {
+        "id": email["id"],
+        "from": email["from"],
+        "to": email["to"],
+        "subject": email["subject"],
+        "date": email["date"],
+        "body": email["body"][:20000],   # keep very long newsletters manageable
+    }
