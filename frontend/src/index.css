@@ -1193,3 +1193,7 @@ a {
 .demo-link:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .demo-link:disabled { opacity: 0.5; cursor: not-allowed; }
 @media (max-width: 768px) { .demo-grid { grid-template-columns: 1fr; } }
+
+/* Keep the received email fully visible; let the panel scroll instead of squeezing it */
+.reply-panel-body > * { flex-shrink: 0; }
+.email-view-body { max-height: 320px; }
