@@ -1181,3 +1181,15 @@ a {
 .email-view-body.muted { color: var(--text-tertiary); font-style: italic; }
 .email-view-toggle { width: 100%; padding: 8px; border: 0; border-top: 1px solid var(--border-primary); background: var(--bg-tertiary); color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .email-view-toggle:hover { background: var(--bg-hover); }
+
+/* ---------- Demo mode ---------- */
+.demo-btn { width: 100%; padding: 13px 20px; border: 0; border-radius: 12px; background: linear-gradient(135deg, var(--accent), #8b5cf6); color: #fff; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); transition: all 0.2s ease; }
+.demo-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4); }
+.demo-input { width: 100%; padding: 10px 12px; border: 1px solid var(--border-primary); border-radius: 10px; background: var(--bg-secondary); color: var(--text-primary); font: inherit; outline: none; }
+.demo-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
+.demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.demo-note { font-size: 12px; color: var(--text-tertiary); line-height: 1.5; }
+.demo-link { display: inline-flex; align-items: center; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border-primary); background: var(--bg-primary); color: var(--text-secondary); font: inherit; font-size: 13px; font-weight: 500; text-decoration: none; cursor: pointer; white-space: nowrap; transition: all 0.2s ease; }
+.demo-link:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.demo-link:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (max-width: 768px) { .demo-grid { grid-template-columns: 1fr; } }

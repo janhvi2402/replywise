@@ -4,8 +4,10 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from dotenv import load_dotenv
 import os
 
+from app.extensions import limiter
 from app.routes.auth_routes import auth_bp
 from app.routes.email_routes import email_bp
+from app.routes.demo_routes import demo_bp
 
 load_dotenv()
 
@@ -27,8 +29,11 @@ def create_app():
 
     CORS(app, origins=[os.getenv("FRONTEND_URL")])
 
+    limiter.init_app(app)                 # <-- added: enables the rate limits
+
     app.register_blueprint(auth_bp)
     app.register_blueprint(email_bp)
+    app.register_blueprint(demo_bp)       # <-- added: /demo/reply
 
     @app.route("/api/health")
     def health():

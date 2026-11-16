@@ -34,7 +34,7 @@ function Check() {
   )
 }
 
-export default function LoginScreen() {
+export default function LoginScreen({ onDemo })  {
   const [failed] = useState(
     () => new URLSearchParams(window.location.search).get('login') === 'failed'
   )
@@ -85,7 +85,11 @@ export default function LoginScreen() {
               {import.meta.env.DEV ? ' (open this app at http://127.0.0.1:5173)' : ''}.
             </div>
           )}
-
+          <button className="demo-btn" onClick={onDemo}>Try the live demo (no login)</button>
+          <p className="demo-note" style={{ margin: '10px 0 16px' }}>
+            Gmail sign-in is limited to approved testers while Google reviews the app.
+            The demo works for everyone.
+</p>
           <a className="google-signin" href={`${BACKEND}/auth/login`}>
             <GoogleG /> Continue with Google
           </a>
